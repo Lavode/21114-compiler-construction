@@ -1,2 +1,4 @@
 slides/
 exercises/*.pdf
+exercises/**/target
+exercuses/**/Cargo.lock
