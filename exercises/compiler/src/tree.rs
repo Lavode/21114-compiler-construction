@@ -1,5 +1,7 @@
+pub mod visitor;
+
 pub struct Tree {
-    root: Node,
+    root: Expression,
 }
 
 impl Tree {
@@ -11,38 +13,29 @@ impl Tree {
     }
 }
 
-/// Supported arithmetic operations.
-pub enum Operation {
-    Addition,
-    Multiplication,
-}
-
-/// Types of nodes in our tree.
+/// Types of expressions in our tree.
 ///
-/// As we only support binary operations, we differentiate between leaf nodes containing a numbe,
-/// and branch nodes with two children and an arithmetic operation.
-pub enum Node {
-    Leaf(i64),
-    Branch {
-        left: Box<Node>,
-        right: Box<Node>,
-        operation: Operation,
+/// As we only support binary operations, we differentiate between literal expressions (leaves in
+/// the tree), and arithmetic operations (branches in the tree).
+pub enum Expression {
+    IntLiteral(i64),
+    Addition {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    Multiplication {
+        left: Box<Expression>,
+        right: Box<Expression>,
     },
 }
 
-impl Node {
-    /// Evaluate the value of the node.
+impl Expression {
+    /// Evaluate the value of the expression.
     pub fn eval(&self) -> i64 {
         match self {
-            Node::Leaf(i) => return *i,
-            Node::Branch {
-                left,
-                right,
-                operation,
-            } => match operation {
-                Operation::Addition => return left.eval() + right.eval(),
-                Operation::Multiplication => return left.eval() * right.eval(),
-            },
+            Expression::IntLiteral(i) => *i,
+            Expression::Addition { left, right } => left.eval() + right.eval(),
+            Expression::Multiplication { left, right } => left.eval() * right.eval(),
         }
     }
 }
@@ -55,17 +48,11 @@ pub fn eval(tree: &Tree) -> i64 {
 }
 
 // Recursive evaluation of the tree in a procedural approach.
-fn eval_recursive(node: &Node) -> i64 {
-    match node {
-        Node::Leaf(i) => return *i,
-        Node::Branch {
-            left,
-            right,
-            operation,
-        } => match operation {
-            Operation::Addition => return eval_recursive(left) + eval_recursive(right),
-            Operation::Multiplication => return eval_recursive(left) * eval_recursive(right),
-        },
+fn eval_recursive(expr: &Expression) -> i64 {
+    match expr {
+        Expression::IntLiteral(i) => *i,
+        Expression::Addition { left, right } => eval_recursive(left) + eval_recursive(right),
+        Expression::Multiplication { left, right } => eval_recursive(left) * eval_recursive(right),
     }
 }
 
@@ -75,13 +62,11 @@ mod tests {
 
     fn sample_tree() -> Tree {
         Tree {
-            root: Node::Branch {
-                operation: Operation::Addition,
-                left: Box::new(Node::Leaf(5)),
-                right: Box::new(Node::Branch {
-                    operation: Operation::Multiplication,
-                    left: Box::new(Node::Leaf(2)),
-                    right: Box::new(Node::Leaf(10)),
+            root: Expression::Addition {
+                left: Box::new(Expression::IntLiteral(5)),
+                right: Box::new(Expression::Multiplication {
+                    left: Box::new(Expression::IntLiteral(2)),
+                    right: Box::new(Expression::IntLiteral(10)),
                 }),
             },
         }
@@ -89,22 +74,29 @@ mod tests {
 
     #[test]
     fn test_procedural() {
-        let tree = sample_tree();
+        let int_literal = Expression::IntLiteral(42);
+        assert_eq!(eval_recursive(&int_literal), 42);
 
+        let mult = Expression::Multiplication {
+            left: Box::new(Expression::IntLiteral(2)),
+            right: Box::new(Expression::IntLiteral(10)),
+        };
+        assert_eq!(eval_recursive(&mult), 20);
+
+        let tree = sample_tree();
         assert_eq!(eval(&tree), 25);
     }
 
     #[test]
     fn test_oop() {
-        let branch_node = Node::Branch {
-            operation: Operation::Multiplication,
-            left: Box::new(Node::Leaf(2)),
-            right: Box::new(Node::Leaf(10)),
-        };
-        assert_eq!(branch_node.eval(), 20);
+        let int_literal = Expression::IntLiteral(42);
+        assert_eq!(int_literal.eval(), 42);
 
-        let leaf_node = Node::Leaf(42);
-        assert_eq!(leaf_node.eval(), 42);
+        let mult = Expression::Multiplication {
+            left: Box::new(Expression::IntLiteral(2)),
+            right: Box::new(Expression::IntLiteral(10)),
+        };
+        assert_eq!(mult.eval(), 20);
 
         let tree = sample_tree();
         assert_eq!(tree.eval(), 25);
