@@ -17,6 +17,7 @@ impl Tree {
 ///
 /// As we only support binary operations, we differentiate between literal expressions (leaves in
 /// the tree), and arithmetic operations (branches in the tree).
+#[derive(Debug)]
 pub enum Expression {
     IntLiteral(i64),
     Addition {
@@ -63,10 +64,19 @@ mod tests {
     fn sample_tree() -> Tree {
         Tree {
             root: Expression::Addition {
-                left: Box::new(Expression::IntLiteral(5)),
+                left: Box::new(Expression::Addition {
+                    left: Box::new(Expression::IntLiteral(7)),
+                    right: Box::new(Expression::Addition {
+                        left: Box::new(Expression::IntLiteral(11)),
+                        right: Box::new(Expression::IntLiteral(12)),
+                    }),
+                }),
                 right: Box::new(Expression::Multiplication {
                     left: Box::new(Expression::IntLiteral(2)),
-                    right: Box::new(Expression::IntLiteral(10)),
+                    right: Box::new(Expression::Multiplication {
+                        left: Box::new(Expression::IntLiteral(3)),
+                        right: Box::new(Expression::IntLiteral(5)),
+                    }),
                 }),
             },
         }
@@ -84,7 +94,7 @@ mod tests {
         assert_eq!(eval_recursive(&mult), 20);
 
         let tree = sample_tree();
-        assert_eq!(eval(&tree), 25);
+        assert_eq!(eval(&tree), 60);
     }
 
     #[test]
@@ -99,6 +109,6 @@ mod tests {
         assert_eq!(mult.eval(), 20);
 
         let tree = sample_tree();
-        assert_eq!(tree.eval(), 25);
+        assert_eq!(tree.eval(), 60);
     }
 }
