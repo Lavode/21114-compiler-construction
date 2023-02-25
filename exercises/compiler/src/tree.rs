@@ -24,6 +24,10 @@ pub enum Expression {
         left: Box<Expression>,
         right: Box<Expression>,
     },
+    Subtraction {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
     Multiplication {
         left: Box<Expression>,
         right: Box<Expression>,
@@ -36,6 +40,7 @@ impl Expression {
         match self {
             Expression::IntLiteral(i) => *i,
             Expression::Addition { left, right } => left.eval() + right.eval(),
+            Expression::Subtraction { left, right } => left.eval() - right.eval(),
             Expression::Multiplication { left, right } => left.eval() * right.eval(),
         }
     }
@@ -53,6 +58,7 @@ fn eval_recursive(expr: &Expression) -> i64 {
     match expr {
         Expression::IntLiteral(i) => *i,
         Expression::Addition { left, right } => eval_recursive(left) + eval_recursive(right),
+        Expression::Subtraction { left, right } => eval_recursive(left) - eval_recursive(right),
         Expression::Multiplication { left, right } => eval_recursive(left) * eval_recursive(right),
     }
 }

@@ -32,6 +32,12 @@ impl Visitor for EvalVisitor {
 
                 self.stack.push(left + right);
             }
+            Expression::Subtraction { left: _, right: _ } => {
+                let left = self.stack.pop().unwrap();
+                let right = self.stack.pop().unwrap();
+
+                self.stack.push(left - right);
+            }
             Expression::Multiplication { left: _, right: _ } => {
                 let left = self.stack.pop().unwrap();
                 let right = self.stack.pop().unwrap();
@@ -50,6 +56,12 @@ impl Expression {
                 visitor.visit_expression(self);
             }
             Expression::Addition { left, right } => {
+                left.accept(visitor);
+                right.accept(visitor);
+
+                visitor.visit_expression(self);
+            }
+            Expression::Subtraction { left, right } => {
                 left.accept(visitor);
                 right.accept(visitor);
 
