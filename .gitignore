@@ -1,4 +1,6 @@
 slides/
 exercises/*.pdf
-exercises/compiler/target
-exercuses/compiler/Cargo.lock
+exercises/introduction/target
+exercuses/introduction/Cargo.lock
+exercises/spl/target
+exercuses/spl/Cargo.lock
