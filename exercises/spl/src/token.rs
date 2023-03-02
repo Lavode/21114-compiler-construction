@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
@@ -16,7 +17,7 @@ impl Display for Token {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum TokenType {
     // Operators
     Plus,
@@ -26,10 +27,10 @@ pub enum TokenType {
     Equals,
     DoubleEquals,
     NotEquals,
-    GreaterThan,
-    LessThan,
-    GreaterOrEqualThan,
-    LessOrEqualThan,
+    Greater,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
 
     // Special characters
     Semicolon,
@@ -54,7 +55,7 @@ pub enum TokenType {
     String,
 
     // Variables
-    Identifiers,
+    Identifier,
 }
 
 impl Display for TokenType {

@@ -1,5 +1,7 @@
 use spl::lexer::Lexer;
 
 fn main() {
-    let lexer = Lexer::new("Test");
+    let mut lexer = Lexer::new("Test");
+
+    lexer.tokenize();
 }
