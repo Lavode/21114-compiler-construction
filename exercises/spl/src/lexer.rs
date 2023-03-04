@@ -17,16 +17,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Peek at the next character without advancing the position in the input.
+    ///
+    /// Returns None if the end of the input is reached.
     fn peek(&mut self) -> Option<&char> {
         self.chars.peek()
     }
 
+    /// Advance by one character, returning it.
+    ///
+    /// Returns None if the end of the input is reached.
     fn advance(&mut self) -> Option<char> {
         self.column += 1;
         self.chars.next()
     }
 
-    fn advance_if_matching(&mut self, expected: char) -> bool {
+    /// Advance if the next character is equal to `expected`.
+    fn advance_if_equal(&mut self, expected: char) -> bool {
         match self.peek() {
             None => return false,
             Some(c) => {
@@ -39,6 +46,28 @@ impl<'a> Lexer<'a> {
                 }
             }
         }
+    }
+
+    /// Calls the provided closure with the next character. As long as it evaluates to true, the
+    /// lexer advances.
+    ///
+    /// Returns a vector of all characters through which the lexer advanced.
+    fn advance_while_matching<F>(&mut self, f: F) -> Vec<char>
+    where
+        F: Fn(char) -> bool,
+    {
+        let mut out = Vec::new();
+
+        while let Some(c) = self.peek() {
+            if !f(*c) {
+                break;
+            }
+
+            // We know that something is there as peek() returned Some, so we unwrap.
+            out.push(self.advance().unwrap());
+        }
+
+        return out;
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {
@@ -72,7 +101,7 @@ impl<'a> Lexer<'a> {
                     }),
 
                     '=' => {
-                        if self.advance_if_matching('=') {
+                        if self.advance_if_equal('=') {
                             tokens.push(Token {
                                 token_type: TokenType::DoubleEquals,
                                 lexeme: "==".into(),
@@ -88,7 +117,7 @@ impl<'a> Lexer<'a> {
                     }
 
                     '>' => {
-                        if self.advance_if_matching('=') {
+                        if self.advance_if_equal('=') {
                             tokens.push(Token {
                                 token_type: TokenType::GreaterOrEqual,
                                 lexeme: ">=".into(),
@@ -104,7 +133,7 @@ impl<'a> Lexer<'a> {
                     }
 
                     '<' => {
-                        if self.advance_if_matching('=') {
+                        if self.advance_if_equal('=') {
                             tokens.push(Token {
                                 token_type: TokenType::LessOrEqual,
                                 lexeme: "<=".into(),
@@ -120,7 +149,7 @@ impl<'a> Lexer<'a> {
                     }
 
                     '!' => {
-                        if self.advance_if_matching('=') {
+                        if self.advance_if_equal('=') {
                             tokens.push(Token {
                                 token_type: TokenType::NotEquals,
                                 lexeme: "!=".into(),
@@ -175,23 +204,10 @@ impl<'a> Lexer<'a> {
                             let mut name = String::new();
                             name.push(c);
 
-                            // TODO: Extract this into utility method.
-                            // Consume all following alphanumeric characters, or until the end of
-                            // the input.
-                            loop {
-                                match self.peek() {
-                                    Some(next_char) => {
-                                        if next_char.is_alphanumeric() {
-                                            // We can unwrap here as we know that there is one
-                                            // present
-                                            name.push(self.advance().unwrap());
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                    None => break,
-                                }
-                            }
+                            // Consume all following alphanumeric characters
+                            let additional_chars =
+                                self.advance_while_matching(|c| c.is_alphanumeric());
+                            name.extend(additional_chars.iter());
 
                             match name.as_str() {
                                 "true" => tokens.push(Token {
@@ -313,21 +329,39 @@ mod tests {
     }
 
     #[test]
-    fn test_advance_if_matching() {
+    fn test_advance_if_equal() {
         let mut lex = Lexer::new("foo");
 
-        assert_eq!(lex.advance_if_matching('f'), true);
+        assert_eq!(lex.advance_if_equal('f'), true);
         assert_eq!(lex.column, 1);
 
-        assert_eq!(lex.advance_if_matching('f'), false);
+        assert_eq!(lex.advance_if_equal('f'), false);
         assert_eq!(lex.column, 1);
 
-        assert_eq!(lex.advance_if_matching('o'), true);
+        assert_eq!(lex.advance_if_equal('o'), true);
         assert_eq!(lex.column, 2);
 
         // At end of input
         let mut lex = Lexer::new("");
-        assert!(!lex.advance_if_matching('f'));
+        assert!(!lex.advance_if_equal('f'));
+    }
+
+    #[test]
+    fn test_advance_while_matching() {
+        let mut lex = Lexer::new("abc123def");
+        let tokens = lex.advance_while_matching(|c| c.is_alphabetic());
+        assert_eq!(tokens, vec!['a', 'b', 'c']);
+        assert_eq!(lex.column, 3);
+
+        let mut lex = Lexer::new("abc123def");
+        let tokens = lex.advance_while_matching(|c| c.is_alphanumeric());
+        assert_eq!(tokens, vec!['a', 'b', 'c', '1', '2', '3', 'd', 'e', 'f']);
+        assert_eq!(lex.column, 9);
+
+        let mut lex = Lexer::new("-0abc123def");
+        let tokens = lex.advance_while_matching(|c| c.is_alphanumeric());
+        assert_eq!(tokens, vec![]);
+        assert_eq!(lex.column, 0);
     }
 
     #[test]
