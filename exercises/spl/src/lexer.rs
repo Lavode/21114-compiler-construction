@@ -52,18 +52,27 @@ impl<'a> Lexer<'a> {
     ///
     /// Returns a vector of all characters through which the lexer advanced. `expected` is not part
     /// of the output vector.
-    fn advance_until_equal(&mut self, expected: char) -> Vec<char> {
+    ///
+    /// Returns an error if the lexer ran out of input before finding a match.
+    fn advance_until_equal(&mut self, expected: char) -> Result<Vec<char>, ()> {
         let mut out = Vec::new();
 
-        while let Some(c) = self.advance() {
-            if c == expected {
-                break;
-            }
+        loop {
+            match self.advance() {
+                Some(c) => {
+                    if c == expected {
+                        break;
+                    }
 
-            out.push(c);
+                    out.push(c);
+                }
+
+                // We reached the end of the input without ifnding our expected character.
+                None => return Err(()),
+            }
         }
 
-        return out;
+        return Ok(out);
     }
 
     /// Advance as long as the provided closure evaluates to true for the next character.
@@ -111,11 +120,21 @@ impl<'a> Lexer<'a> {
                         line: self.line,
                     }),
 
-                    '/' => tokens.push(Token {
-                        token_type: TokenType::Divide,
-                        lexeme: "/".into(),
-                        line: self.line,
-                    }),
+                    '/' => {
+                        if self.advance_if_equal('/') {
+                            // Line comment
+                            let _ = self.advance_until_equal('\n');
+                            self.line += 1;
+                            self.column = 0;
+                        } else {
+                            // Divides operator
+                            tokens.push(Token {
+                                token_type: TokenType::Divide,
+                                lexeme: "/".into(),
+                                line: self.line,
+                            });
+                        }
+                    }
 
                     '=' => {
                         if self.advance_if_equal('=') {
@@ -216,14 +235,17 @@ impl<'a> Lexer<'a> {
                         line: self.line,
                     }),
 
-                    '"' => {
-                        let chars = self.advance_until_equal('"');
-                        tokens.push(Token {
+                    '"' => match self.advance_until_equal('"') {
+                        Ok(chars) => tokens.push(Token {
                             token_type: TokenType::String,
                             lexeme: String::from_iter(chars.iter()),
                             line: self.line,
-                        });
-                    }
+                        }),
+                        Err(_) => eprintln!(
+                            "Error on line {}, column {}: Found unterminated string sequence.",
+                            self.line, self.column
+                        ),
+                    },
 
                     _ => {
                         if c.is_alphabetic() {
@@ -398,14 +420,21 @@ mod tests {
     fn test_advance_until_equal() {
         let mut lex = Lexer::new("abc|def");
         let tokens = lex.advance_until_equal('|');
-        assert_eq!(tokens, vec!['a', 'b', 'c']);
+        assert_eq!(tokens.unwrap(), vec!['a', 'b', 'c']);
         assert_eq!(lex.column, 4);
         assert_eq!(*lex.peek().unwrap(), 'd');
 
         // At end of input
+        let mut lex = Lexer::new("abc|");
+        let tokens = lex.advance_until_equal('|');
+        assert_eq!(tokens.unwrap(), vec!['a', 'b', 'c']);
+        assert_eq!(lex.column, 4);
+        assert!(lex.peek().is_none());
+
+        // No match
         let mut lex = Lexer::new("abc");
         let tokens = lex.advance_until_equal('|');
-        assert_eq!(tokens, vec!['a', 'b', 'c']);
+        assert!(tokens.is_err());
         assert_eq!(lex.column, 4);
         assert!(lex.peek().is_none());
     }
@@ -881,8 +910,34 @@ mod tests {
                 line: 1
             }
         );
+
+        // Unterminated string
+        let mut lex = Lexer::new("\"Hello world");
+        let tokens = lex.tokenize();
+        assert_eq!(tokens, vec![]);
     }
 
-    // TODO: Test
-    // - Comments
+    #[test]
+    fn test_comment() {
+        let mut lex = Lexer::new("// This is a comment\n1");
+        let tokens = lex.tokenize();
+
+        // Should have outright skipped the comment
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::Number,
+                lexeme: "1".into(),
+                line: 2
+            }
+        );
+
+        assert_eq!(lex.line, 2);
+        // We already consumed the single digit on line two, so are in column two now. (Which
+        // happens to be the EOF)
+        assert_eq!(lex.column, 2);
+    }
+
+    #[test]
+    fn test_newline() {}
 }
