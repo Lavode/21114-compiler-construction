@@ -357,7 +357,10 @@ impl<'a> Lexer<'a> {
                                 line: self.line,
                             });
                         } else {
-                            println!("Other char found: {}", c);
+                            eprintln!(
+                                "Error on line {}, column {}: Found unexpected char '{}'",
+                                self.line, self.column, c
+                            );
                         }
                     }
                 },
@@ -411,8 +414,10 @@ mod tests {
         // At end of input
         let mut lex = Lexer::new("");
         assert!(lex.advance().is_none());
+    }
 
-        // Advancing past newline should increase line and reset column.
+    #[test]
+    fn test_advance_past_newline() {
         let mut lex = Lexer::new("ab\na");
         // 'a'
         lex.advance().unwrap();
@@ -456,8 +461,10 @@ mod tests {
         assert_eq!(tokens.unwrap(), vec!['a', 'b', 'c']);
         assert_eq!(lex.column, 4);
         assert!(lex.peek().is_none());
+    }
 
-        // No match
+    #[test]
+    fn test_advance_until_equal_no_match() {
         let mut lex = Lexer::new("abc");
         let tokens = lex.advance_until_equal('|');
         assert!(tokens.is_err());
@@ -476,7 +483,10 @@ mod tests {
         let tokens = lex.advance_while_matching(|c| c.is_alphanumeric());
         assert_eq!(tokens, vec!['a', 'b', 'c', '1', '2', '3', 'd', 'e', 'f']);
         assert_eq!(lex.column, 9);
+    }
 
+    #[test]
+    fn test_advance_while_matching_no_match() {
         let mut lex = Lexer::new("-0abc123def");
         let tokens = lex.advance_while_matching(|c| c.is_alphanumeric());
         assert_eq!(tokens, vec![]);
@@ -573,12 +583,15 @@ mod tests {
                 line: 1
             }
         );
+    }
 
-        // `!` followed by char other than `=`
+    #[test]
+    fn test_not_equals_missing_equals() {
         let mut lex = Lexer::new("!a");
         let tokens = lex.tokenize();
         assert_eq!(tokens.len(), 0);
     }
+
     #[test]
     fn test_greater_than() {
         let mut lex = Lexer::new(">");
@@ -592,6 +605,7 @@ mod tests {
             }
         );
     }
+
     #[test]
     fn test_less_than() {
         let mut lex = Lexer::new("<");
@@ -605,6 +619,7 @@ mod tests {
             }
         );
     }
+
     #[test]
     fn test_greater_or_equal() {
         let mut lex = Lexer::new(">=");
@@ -618,6 +633,7 @@ mod tests {
             }
         );
     }
+
     #[test]
     fn test_less_or_equal() {
         let mut lex = Lexer::new("<=");
@@ -936,8 +952,10 @@ mod tests {
                 line: 1
             }
         );
+    }
 
-        // Empty string
+    #[test]
+    fn test_empty_string() {
         let mut lex = Lexer::new("\"\"");
         let tokens = lex.tokenize();
         assert_eq!(
@@ -948,8 +966,10 @@ mod tests {
                 line: 1
             }
         );
+    }
 
-        // Unterminated string
+    #[test]
+    fn test_unterminated_string() {
         let mut lex = Lexer::new("\"Hello world");
         let tokens = lex.tokenize();
         assert_eq!(tokens, vec![]);
