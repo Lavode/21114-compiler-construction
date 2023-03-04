@@ -48,8 +48,25 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Calls the provided closure with the next character. As long as it evaluates to true, the
-    /// lexer advances.
+    /// Advance until the next character is equal to `expected`.
+    ///
+    /// Returns a vector of all characters through which the lexer advanced. `expected` is not part
+    /// of the output vector.
+    fn advance_until_equal(&mut self, expected: char) -> Vec<char> {
+        let mut out = Vec::new();
+
+        while let Some(c) = self.advance() {
+            if c == expected {
+                break;
+            }
+
+            out.push(c);
+        }
+
+        return out;
+    }
+
+    /// Advance as long as the provided closure evaluates to true for the next character.
     ///
     /// Returns a vector of all characters through which the lexer advanced.
     fn advance_while_matching<F>(&mut self, f: F) -> Vec<char>
@@ -199,6 +216,15 @@ impl<'a> Lexer<'a> {
                         line: self.line,
                     }),
 
+                    '"' => {
+                        let chars = self.advance_until_equal('"');
+                        tokens.push(Token {
+                            token_type: TokenType::String,
+                            lexeme: String::from_iter(chars.iter()),
+                            line: self.line,
+                        });
+                    }
+
                     _ => {
                         if c.is_alphabetic() {
                             let mut name = String::new();
@@ -209,6 +235,7 @@ impl<'a> Lexer<'a> {
                                 self.advance_while_matching(|c| c.is_alphanumeric());
                             name.extend(additional_chars.iter());
 
+                            // Keywords take precedence over identifiers
                             match name.as_str() {
                                 "true" => tokens.push(Token {
                                     token_type: TokenType::True,
@@ -271,9 +298,30 @@ impl<'a> Lexer<'a> {
                                         token_type: TokenType::Identifier,
                                         lexeme: name,
                                         line: self.line,
-                                    })
+                                    });
                                 }
                             }
+                        } else if c.is_digit(10) {
+                            let mut number = String::new();
+                            number.push(c);
+
+                            // Consume all digits before the decimal point.
+                            let additional_digits = self.advance_while_matching(|c| c.is_digit(10));
+                            number.extend(additional_digits.iter());
+
+                            // Consume decimal digits if present
+                            if self.advance_if_equal('.') {
+                                number.push('.');
+                                let additional_digits =
+                                    self.advance_while_matching(|c| c.is_digit(10));
+                                number.extend(additional_digits.iter());
+                            }
+
+                            tokens.push(Token {
+                                token_type: TokenType::Number,
+                                lexeme: number,
+                                line: self.line,
+                            });
                         } else {
                             println!("Other char found: {}", c);
                         }
@@ -344,6 +392,22 @@ mod tests {
         // At end of input
         let mut lex = Lexer::new("");
         assert!(!lex.advance_if_equal('f'));
+    }
+
+    #[test]
+    fn test_advance_until_equal() {
+        let mut lex = Lexer::new("abc|def");
+        let tokens = lex.advance_until_equal('|');
+        assert_eq!(tokens, vec!['a', 'b', 'c']);
+        assert_eq!(lex.column, 4);
+        assert_eq!(*lex.peek().unwrap(), 'd');
+
+        // At end of input
+        let mut lex = Lexer::new("abc");
+        let tokens = lex.advance_until_equal('|');
+        assert_eq!(tokens, vec!['a', 'b', 'c']);
+        assert_eq!(lex.column, 4);
+        assert!(lex.peek().is_none());
     }
 
     #[test]
@@ -752,8 +816,73 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_number() {
+        // Integer
+        let mut lex = Lexer::new("123");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::Number,
+                lexeme: "123".into(),
+                line: 1
+            }
+        );
+
+        // Float
+        let mut lex = Lexer::new("123.456");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::Number,
+                lexeme: "123.456".into(),
+                line: 1
+            }
+        );
+
+        // Float with no decimal digits.
+        let mut lex = Lexer::new("123.");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::Number,
+                lexeme: "123.".into(),
+                line: 1
+            }
+        );
+
+        // TODO test error with multiple decimal points, e.g. 123.456.789
+    }
+
+    #[test]
+    fn test_string() {
+        let mut lex = Lexer::new("\"Hello world\"");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::String,
+                lexeme: "Hello world".into(),
+                line: 1
+            }
+        );
+
+        // Empty string
+        let mut lex = Lexer::new("\"\"");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::String,
+                lexeme: "".into(),
+                line: 1
+            }
+        );
+    }
+
     // TODO: Test
-    // - Numbers
-    // - Strings
     // - Comments
 }
