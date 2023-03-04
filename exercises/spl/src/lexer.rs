@@ -259,6 +259,9 @@ impl<'a> Lexer<'a> {
                     // enjoy this fleeting moment of quiet.
                     '\n' => {}
 
+                    // Whitespace is silently consumed
+                    ' ' | '\t' => {}
+
                     _ => {
                         if c.is_alphabetic() {
                             let mut name = String::new();
@@ -358,8 +361,8 @@ impl<'a> Lexer<'a> {
                             });
                         } else {
                             eprintln!(
-                                "Error on line {}, column {}: Found unexpected char '{}'",
-                                self.line, self.column, c
+                                "Error on line {}, column {}: Found unexpected char '{}' (Unicode {})",
+                                self.line, self.column, c, c.escape_unicode()
                             );
                         }
                     }
@@ -1003,5 +1006,43 @@ mod tests {
 
         assert_eq!(lex.line, 2);
         assert_eq!(lex.column, 7);
+    }
+
+    #[test]
+    fn test_tokenize() {
+        let input = "
+var b = true ; // A boolean
+var i = 123; // A number
+var d = 12.3; // Another number
+var s = \"123 \"; // This is a string , not a number
+
+i + d; // 135.3
+1 == 2; // false
+!true; // false
+true or false; // true
+var average = (min + max ) / 2;
+
+{
+	print \"Hello , world !\";
+	print \"Hello , SPL Prime world !\";
+}
+
+if ( i == s ) {
+	print \"yes\";
+} else {
+	print \"no\";
+}
+
+var a = 1;
+while (a < 10) {
+	print a;
+	a = a + 1;
+}
+";
+
+        let mut lex = Lexer::new(input);
+        let tokens = lex.tokenize();
+
+        assert_eq!(tokens.len(), 93);
     }
 }
