@@ -31,6 +31,7 @@ pub enum TokenType {
     Less,
     GreaterOrEqual,
     LessOrEqual,
+    BooleanNot,
 
     // Special characters
     Semicolon,

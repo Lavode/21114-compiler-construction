@@ -200,18 +200,11 @@ impl<'a> Lexer<'a> {
                                 line: self.line,
                             });
                         } else {
-                            // We found a `!` not followed by an `=`, which is a lexer error. Log
-                            // it, and consume the incorrect character, to carry on.
-                            match self.advance() {
-                                Some(wrong_char) => eprintln!(
-                                    "Error on line {}, column {}: Found `!` followed by `{}` rather than `=`",
-                                    self.line, self.column, wrong_char
-                                ),
-                                None => eprintln!(
-                                    "Error on line {}, column {}: Lone `!` found at end of input",
-                                    self.line, self.column,
-                                ),
-                            }
+                            tokens.push(Token {
+                                token_type: TokenType::BooleanNot,
+                                lexeme: "!".into(),
+                                line: self.line,
+                            });
                         }
                     }
 
@@ -589,13 +582,6 @@ mod tests {
     }
 
     #[test]
-    fn test_not_equals_missing_equals() {
-        let mut lex = Lexer::new("!a");
-        let tokens = lex.tokenize();
-        assert_eq!(tokens.len(), 0);
-    }
-
-    #[test]
     fn test_greater_than() {
         let mut lex = Lexer::new(">");
         let tokens = lex.tokenize();
@@ -646,6 +632,20 @@ mod tests {
             Token {
                 token_type: TokenType::LessOrEqual,
                 lexeme: "<=".into(),
+                line: 1
+            }
+        );
+    }
+
+    #[test]
+    fn test_boolean_not() {
+        let mut lex = Lexer::new("!");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::BooleanNot,
+                lexeme: "!".into(),
                 line: 1
             }
         );
