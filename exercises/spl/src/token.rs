@@ -56,6 +56,9 @@ pub enum TokenType {
 
     // Variables
     Identifier,
+
+    // Returned once when whole input file is tokenized.
+    EndOfile,
 }
 
 impl Display for TokenType {

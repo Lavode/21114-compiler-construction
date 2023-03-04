@@ -29,7 +29,17 @@ impl<'a> Lexer<'a> {
     /// Returns None if the end of the input is reached.
     fn advance(&mut self) -> Option<char> {
         self.column += 1;
-        self.chars.next()
+
+        let next = self.chars.next();
+
+        if next.is_some() {
+            if next.unwrap() == '\n' {
+                self.line += 1;
+                self.column = 0;
+            }
+        }
+
+        next
     }
 
     /// Advance if the next character is equal to `expected`.
@@ -124,8 +134,6 @@ impl<'a> Lexer<'a> {
                         if self.advance_if_equal('/') {
                             // Line comment
                             let _ = self.advance_until_equal('\n');
-                            self.line += 1;
-                            self.column = 0;
                         } else {
                             // Divides operator
                             tokens.push(Token {
@@ -246,6 +254,10 @@ impl<'a> Lexer<'a> {
                             self.line, self.column
                         ),
                     },
+
+                    // advance() handles line and column numbers, there's naught for us to do but
+                    // enjoy this fleeting moment of quiet.
+                    '\n' => {}
 
                     _ => {
                         if c.is_alphabetic() {
@@ -385,17 +397,31 @@ mod tests {
         let mut lex = Lexer::new("foo");
 
         assert_eq!(lex.advance().unwrap(), 'f');
+        assert_eq!(lex.line, 1);
         assert_eq!(lex.column, 1);
 
         assert_eq!(lex.advance().unwrap(), 'o');
+        assert_eq!(lex.line, 1);
         assert_eq!(lex.column, 2);
 
         assert_eq!(lex.advance().unwrap(), 'o');
+        assert_eq!(lex.line, 1);
         assert_eq!(lex.column, 3);
 
         // At end of input
         let mut lex = Lexer::new("");
         assert!(lex.advance().is_none());
+
+        // Advancing past newline should increase line and reset column.
+        let mut lex = Lexer::new("ab\na");
+        // 'a'
+        lex.advance().unwrap();
+        // 'b'
+        lex.advance().unwrap();
+        // '\n'
+        lex.advance().unwrap();
+        assert_eq!(lex.line, 2);
+        assert_eq!(lex.column, 0);
     }
 
     #[test]
@@ -548,7 +574,6 @@ mod tests {
             }
         );
 
-        // TODO test error
         // `!` followed by char other than `=`
         let mut lex = Lexer::new("!a");
         let tokens = lex.tokenize();
@@ -698,7 +723,7 @@ mod tests {
     }
 
     #[test]
-    fn test_() {
+    fn test_false() {
         let mut lex = Lexer::new("false");
         let tokens = lex.tokenize();
 
@@ -883,7 +908,20 @@ mod tests {
             }
         );
 
-        // TODO test error with multiple decimal points, e.g. 123.456.789
+        // Float with no multiple decimal points.
+        // Lexer should recogniez the number (123.456) fine, but then balk on finding a lone
+        // decimal point.
+        let mut lex = Lexer::new("123.456.");
+        let tokens = lex.tokenize();
+        assert_eq!(
+            tokens[0],
+            Token {
+                token_type: TokenType::Number,
+                lexeme: "123.456".into(),
+                line: 1
+            }
+        );
+        assert_eq!(tokens.len(), 1);
     }
 
     #[test]
@@ -939,5 +977,11 @@ mod tests {
     }
 
     #[test]
-    fn test_newline() {}
+    fn test_newline() {
+        let mut lex = Lexer::new("a = 1;\nb = 2;");
+        let _ = lex.tokenize();
+
+        assert_eq!(lex.line, 2);
+        assert_eq!(lex.column, 7);
+    }
 }
