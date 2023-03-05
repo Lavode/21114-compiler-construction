@@ -362,6 +362,13 @@ impl<'a> Lexer<'a> {
             }
         }
 
+        // Reached end of file, add final token.
+        tokens.push(Token {
+            token_type: TokenType::EndOfile,
+            lexeme: "".into(),
+            line: self.line,
+        });
+
         return tokens;
     }
 }
@@ -935,7 +942,8 @@ mod tests {
                 line: 1
             }
         );
-        assert_eq!(tokens.len(), 1);
+        // First token is the number, second the end-of-file marker.
+        assert_eq!(tokens.len(), 2);
     }
 
     #[test]
@@ -970,7 +978,14 @@ mod tests {
     fn test_unterminated_string() {
         let mut lex = Lexer::new("\"Hello world");
         let tokens = lex.tokenize();
-        assert_eq!(tokens, vec![]);
+        assert_eq!(
+            tokens,
+            vec![Token {
+                token_type: TokenType::EndOfile,
+                lexeme: "".into(),
+                line: 1
+            }]
+        );
     }
 
     #[test]
@@ -1001,6 +1016,21 @@ mod tests {
 
         assert_eq!(lex.line, 2);
         assert_eq!(lex.column, 7);
+    }
+
+    #[test]
+    fn test_end_of_file() {
+        let mut lex = Lexer::new("a");
+        let tokens = lex.tokenize();
+
+        assert_eq!(
+            tokens[1],
+            Token {
+                token_type: TokenType::EndOfile,
+                lexeme: "".into(),
+                line: 1
+            }
+        );
     }
 
     #[test]
@@ -1038,6 +1068,6 @@ while (a < 10) {
         let mut lex = Lexer::new(input);
         let tokens = lex.tokenize();
 
-        assert_eq!(tokens.len(), 93);
+        assert_eq!(tokens.len(), 94);
     }
 }
