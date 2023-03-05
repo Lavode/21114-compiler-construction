@@ -109,260 +109,255 @@ impl<'a> Lexer<'a> {
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens = Vec::new();
 
-        loop {
-            match self.advance() {
-                Some(c) => match c {
-                    '+' => tokens.push(Token {
-                        token_type: TokenType::Plus,
-                        lexeme: "+".into(),
-                        line: self.line,
-                    }),
+        while let Some(c) = self.advance() {
+            match c {
+                '+' => tokens.push(Token {
+                    token_type: TokenType::Plus,
+                    lexeme: "+".into(),
+                    line: self.line,
+                }),
 
-                    '-' => tokens.push(Token {
-                        token_type: TokenType::Minus,
-                        lexeme: "-".into(),
-                        line: self.line,
-                    }),
+                '-' => tokens.push(Token {
+                    token_type: TokenType::Minus,
+                    lexeme: "-".into(),
+                    line: self.line,
+                }),
 
-                    '*' => tokens.push(Token {
-                        token_type: TokenType::Times,
-                        lexeme: "*".into(),
-                        line: self.line,
-                    }),
+                '*' => tokens.push(Token {
+                    token_type: TokenType::Times,
+                    lexeme: "*".into(),
+                    line: self.line,
+                }),
 
-                    '/' => {
-                        if self.advance_if_equal('/') {
-                            // Line comment
-                            let _ = self.advance_until_equal('\n');
-                        } else {
-                            // Divides operator
-                            tokens.push(Token {
-                                token_type: TokenType::Divide,
-                                lexeme: "/".into(),
-                                line: self.line,
-                            });
-                        }
-                    }
-
-                    '=' => {
-                        if self.advance_if_equal('=') {
-                            tokens.push(Token {
-                                token_type: TokenType::DoubleEquals,
-                                lexeme: "==".into(),
-                                line: self.line,
-                            });
-                        } else {
-                            tokens.push(Token {
-                                token_type: TokenType::Equals,
-                                lexeme: "=".into(),
-                                line: self.line,
-                            });
-                        }
-                    }
-
-                    '>' => {
-                        if self.advance_if_equal('=') {
-                            tokens.push(Token {
-                                token_type: TokenType::GreaterOrEqual,
-                                lexeme: ">=".into(),
-                                line: self.line,
-                            });
-                        } else {
-                            tokens.push(Token {
-                                token_type: TokenType::Greater,
-                                lexeme: ">".into(),
-                                line: self.line,
-                            });
-                        }
-                    }
-
-                    '<' => {
-                        if self.advance_if_equal('=') {
-                            tokens.push(Token {
-                                token_type: TokenType::LessOrEqual,
-                                lexeme: "<=".into(),
-                                line: self.line,
-                            });
-                        } else {
-                            tokens.push(Token {
-                                token_type: TokenType::Less,
-                                lexeme: "<".into(),
-                                line: self.line,
-                            });
-                        }
-                    }
-
-                    '!' => {
-                        if self.advance_if_equal('=') {
-                            tokens.push(Token {
-                                token_type: TokenType::NotEquals,
-                                lexeme: "!=".into(),
-                                line: self.line,
-                            });
-                        } else {
-                            tokens.push(Token {
-                                token_type: TokenType::BooleanNot,
-                                lexeme: "!".into(),
-                                line: self.line,
-                            });
-                        }
-                    }
-
-                    ';' => tokens.push(Token {
-                        token_type: TokenType::Semicolon,
-                        lexeme: ";".into(),
-                        line: self.line,
-                    }),
-
-                    '(' => tokens.push(Token {
-                        token_type: TokenType::OpeningParentheses,
-                        lexeme: "(".into(),
-                        line: self.line,
-                    }),
-                    ')' => tokens.push(Token {
-                        token_type: TokenType::ClosingParentheses,
-                        lexeme: ")".into(),
-                        line: self.line,
-                    }),
-
-                    '{' => tokens.push(Token {
-                        token_type: TokenType::OpeningBraces,
-                        lexeme: "{".into(),
-                        line: self.line,
-                    }),
-                    '}' => tokens.push(Token {
-                        token_type: TokenType::ClosingBraces,
-                        lexeme: "}".into(),
-                        line: self.line,
-                    }),
-
-                    '"' => match self.advance_until_equal('"') {
-                        Ok(chars) => tokens.push(Token {
-                            token_type: TokenType::String,
-                            lexeme: String::from_iter(chars.iter()),
+                '/' => {
+                    if self.advance_if_equal('/') {
+                        // Line comment
+                        let _ = self.advance_until_equal('\n');
+                    } else {
+                        // Divides operator
+                        tokens.push(Token {
+                            token_type: TokenType::Divide,
+                            lexeme: "/".into(),
                             line: self.line,
-                        }),
-                        Err(_) => eprintln!(
-                            "Error on line {}, column {}: Found unterminated string sequence.",
-                            self.line, self.column
-                        ),
-                    },
+                        });
+                    }
+                }
 
-                    // advance() handles line and column numbers, there's naught for us to do but
-                    // enjoy this fleeting moment of quiet.
-                    '\n' => {}
+                '=' => {
+                    if self.advance_if_equal('=') {
+                        tokens.push(Token {
+                            token_type: TokenType::DoubleEquals,
+                            lexeme: "==".into(),
+                            line: self.line,
+                        });
+                    } else {
+                        tokens.push(Token {
+                            token_type: TokenType::Equals,
+                            lexeme: "=".into(),
+                            line: self.line,
+                        });
+                    }
+                }
 
-                    // Whitespace is silently consumed
-                    ' ' | '\t' => {}
+                '>' => {
+                    if self.advance_if_equal('=') {
+                        tokens.push(Token {
+                            token_type: TokenType::GreaterOrEqual,
+                            lexeme: ">=".into(),
+                            line: self.line,
+                        });
+                    } else {
+                        tokens.push(Token {
+                            token_type: TokenType::Greater,
+                            lexeme: ">".into(),
+                            line: self.line,
+                        });
+                    }
+                }
 
-                    _ => {
-                        if c.is_alphabetic() {
-                            let mut name = String::new();
-                            name.push(c);
+                '<' => {
+                    if self.advance_if_equal('=') {
+                        tokens.push(Token {
+                            token_type: TokenType::LessOrEqual,
+                            lexeme: "<=".into(),
+                            line: self.line,
+                        });
+                    } else {
+                        tokens.push(Token {
+                            token_type: TokenType::Less,
+                            lexeme: "<".into(),
+                            line: self.line,
+                        });
+                    }
+                }
 
-                            // Consume all following alphanumeric characters
-                            let additional_chars =
-                                self.advance_while_matching(|c| c.is_alphanumeric());
-                            name.extend(additional_chars.iter());
+                '!' => {
+                    if self.advance_if_equal('=') {
+                        tokens.push(Token {
+                            token_type: TokenType::NotEquals,
+                            lexeme: "!=".into(),
+                            line: self.line,
+                        });
+                    } else {
+                        tokens.push(Token {
+                            token_type: TokenType::BooleanNot,
+                            lexeme: "!".into(),
+                            line: self.line,
+                        });
+                    }
+                }
 
-                            // Keywords take precedence over identifiers
-                            match name.as_str() {
-                                "true" => tokens.push(Token {
-                                    token_type: TokenType::True,
-                                    lexeme: "true".into(),
+                ';' => tokens.push(Token {
+                    token_type: TokenType::Semicolon,
+                    lexeme: ";".into(),
+                    line: self.line,
+                }),
+
+                '(' => tokens.push(Token {
+                    token_type: TokenType::OpeningParentheses,
+                    lexeme: "(".into(),
+                    line: self.line,
+                }),
+                ')' => tokens.push(Token {
+                    token_type: TokenType::ClosingParentheses,
+                    lexeme: ")".into(),
+                    line: self.line,
+                }),
+
+                '{' => tokens.push(Token {
+                    token_type: TokenType::OpeningBraces,
+                    lexeme: "{".into(),
+                    line: self.line,
+                }),
+                '}' => tokens.push(Token {
+                    token_type: TokenType::ClosingBraces,
+                    lexeme: "}".into(),
+                    line: self.line,
+                }),
+
+                '"' => match self.advance_until_equal('"') {
+                    Ok(chars) => tokens.push(Token {
+                        token_type: TokenType::String,
+                        lexeme: String::from_iter(chars.iter()),
+                        line: self.line,
+                    }),
+                    Err(_) => eprintln!(
+                        "Error on line {}, column {}: Found unterminated string sequence.",
+                        self.line, self.column
+                    ),
+                },
+
+                // advance() handles line and column numbers, there's naught for us to do but
+                // enjoy this fleeting moment of quiet.
+                '\n' => {}
+
+                // Whitespace is silently consumed
+                ' ' | '\t' => {}
+
+                _ => {
+                    if c.is_alphabetic() {
+                        let mut name = String::new();
+                        name.push(c);
+
+                        // Consume all following alphanumeric characters
+                        let additional_chars = self.advance_while_matching(|c| c.is_alphanumeric());
+                        name.extend(additional_chars.iter());
+
+                        // Keywords take precedence over identifiers
+                        match name.as_str() {
+                            "true" => tokens.push(Token {
+                                token_type: TokenType::True,
+                                lexeme: "true".into(),
+                                line: self.line,
+                            }),
+
+                            "false" => tokens.push(Token {
+                                token_type: TokenType::False,
+                                lexeme: "false".into(),
+                                line: self.line,
+                            }),
+
+                            "and" => tokens.push(Token {
+                                token_type: TokenType::And,
+                                lexeme: "and".into(),
+                                line: self.line,
+                            }),
+
+                            "or" => tokens.push(Token {
+                                token_type: TokenType::Or,
+                                lexeme: "or".into(),
+                                line: self.line,
+                            }),
+
+                            "var" => tokens.push(Token {
+                                token_type: TokenType::Var,
+                                lexeme: "var".into(),
+                                line: self.line,
+                            }),
+
+                            "print" => tokens.push(Token {
+                                token_type: TokenType::Print,
+                                lexeme: "print".into(),
+                                line: self.line,
+                            }),
+
+                            "if" => tokens.push(Token {
+                                token_type: TokenType::If,
+                                lexeme: "if".into(),
+                                line: self.line,
+                            }),
+
+                            "else" => tokens.push(Token {
+                                token_type: TokenType::Else,
+                                lexeme: "else".into(),
+                                line: self.line,
+                            }),
+
+                            "while" => tokens.push(Token {
+                                token_type: TokenType::While,
+                                lexeme: "while".into(),
+                                line: self.line,
+                            }),
+
+                            _ => {
+                                // An alphanumeric name which doesn't correspond to any
+                                // keyword is an identifier.
+                                tokens.push(Token {
+                                    token_type: TokenType::Identifier,
+                                    lexeme: name,
                                     line: self.line,
-                                }),
-
-                                "false" => tokens.push(Token {
-                                    token_type: TokenType::False,
-                                    lexeme: "false".into(),
-                                    line: self.line,
-                                }),
-
-                                "and" => tokens.push(Token {
-                                    token_type: TokenType::And,
-                                    lexeme: "and".into(),
-                                    line: self.line,
-                                }),
-
-                                "or" => tokens.push(Token {
-                                    token_type: TokenType::Or,
-                                    lexeme: "or".into(),
-                                    line: self.line,
-                                }),
-
-                                "var" => tokens.push(Token {
-                                    token_type: TokenType::Var,
-                                    lexeme: "var".into(),
-                                    line: self.line,
-                                }),
-
-                                "print" => tokens.push(Token {
-                                    token_type: TokenType::Print,
-                                    lexeme: "print".into(),
-                                    line: self.line,
-                                }),
-
-                                "if" => tokens.push(Token {
-                                    token_type: TokenType::If,
-                                    lexeme: "if".into(),
-                                    line: self.line,
-                                }),
-
-                                "else" => tokens.push(Token {
-                                    token_type: TokenType::Else,
-                                    lexeme: "else".into(),
-                                    line: self.line,
-                                }),
-
-                                "while" => tokens.push(Token {
-                                    token_type: TokenType::While,
-                                    lexeme: "while".into(),
-                                    line: self.line,
-                                }),
-
-                                _ => {
-                                    // An alphanumeric name which doesn't correspond to any
-                                    // keyword is an identifier.
-                                    tokens.push(Token {
-                                        token_type: TokenType::Identifier,
-                                        lexeme: name,
-                                        line: self.line,
-                                    });
-                                }
+                                });
                             }
-                        } else if c.is_digit(10) {
-                            let mut number = String::new();
-                            number.push(c);
+                        }
+                    } else if c.is_digit(10) {
+                        let mut number = String::new();
+                        number.push(c);
 
-                            // Consume all digits before the decimal point.
+                        // Consume all digits before the decimal point.
+                        let additional_digits = self.advance_while_matching(|c| c.is_digit(10));
+                        number.extend(additional_digits.iter());
+
+                        // Consume decimal digits if present
+                        if self.advance_if_equal('.') {
+                            number.push('.');
                             let additional_digits = self.advance_while_matching(|c| c.is_digit(10));
                             number.extend(additional_digits.iter());
-
-                            // Consume decimal digits if present
-                            if self.advance_if_equal('.') {
-                                number.push('.');
-                                let additional_digits =
-                                    self.advance_while_matching(|c| c.is_digit(10));
-                                number.extend(additional_digits.iter());
-                            }
-
-                            tokens.push(Token {
-                                token_type: TokenType::Number,
-                                lexeme: number,
-                                line: self.line,
-                            });
-                        } else {
-                            eprintln!(
-                                "Error on line {}, column {}: Found unexpected char '{}' (Unicode {})",
-                                self.line, self.column, c, c.escape_unicode()
-                            );
                         }
+
+                        tokens.push(Token {
+                            token_type: TokenType::Number,
+                            lexeme: number,
+                            line: self.line,
+                        });
+                    } else {
+                        eprintln!(
+                            "Error on line {}, column {}: Found unexpected char '{}' (Unicode {})",
+                            self.line,
+                            self.column,
+                            c,
+                            c.escape_unicode()
+                        );
                     }
-                },
-                None => {
-                    // We reached the end of our input
-                    break;
                 }
             }
         }
