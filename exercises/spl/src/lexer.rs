@@ -1,6 +1,9 @@
 use std::{iter::Peekable, str::Chars};
 
-use crate::token::{Token, TokenType};
+use crate::{
+    error::{LexerError, Position},
+    token::{Token, TokenType},
+};
 
 pub struct Lexer<'a> {
     chars: Peekable<Chars<'a>>,
@@ -106,7 +109,9 @@ impl<'a> Lexer<'a> {
         return out;
     }
 
-    pub fn tokenize(&mut self) -> Vec<Token> {
+    pub fn tokenize(&mut self) -> Result<Vec<Token>, Vec<LexerError>> {
+        let mut errors: Vec<LexerError> = Vec::new();
+
         let mut tokens = Vec::new();
 
         while let Some(c) = self.advance() {
@@ -235,17 +240,29 @@ impl<'a> Lexer<'a> {
                     line: self.line,
                 }),
 
-                '"' => match self.advance_until_equal('"') {
-                    Ok(chars) => tokens.push(Token {
-                        token_type: TokenType::String,
-                        lexeme: String::from_iter(chars.iter()),
-                        line: self.line,
-                    }),
-                    Err(_) => eprintln!(
-                        "Error on line {}, column {}: Found unterminated string sequence.",
-                        self.line, self.column
-                    ),
-                },
+                '"' => {
+                    // We'll keep track of this to be able to provide a better error in case of an
+                    // unterminated string.
+                    let (starts_at_line, starts_at_column) = (self.line, self.column);
+
+                    match self.advance_until_equal('"') {
+                        Ok(chars) => tokens.push(Token {
+                            token_type: TokenType::String,
+                            lexeme: String::from_iter(chars.iter()),
+                            line: self.line,
+                        }),
+                        Err(_) => errors.push(LexerError::UnterminatedStringSequence {
+                            starts_at: Position {
+                                line: starts_at_line,
+                                column: starts_at_column,
+                            },
+                            ends_at: Position {
+                                line: self.line,
+                                column: self.column,
+                            },
+                        }),
+                    }
+                }
 
                 // advance() handles line and column numbers, there's naught for us to do but
                 // enjoy this fleeting moment of quiet.
@@ -350,13 +367,13 @@ impl<'a> Lexer<'a> {
                             line: self.line,
                         });
                     } else {
-                        eprintln!(
-                            "Error on line {}, column {}: Found unexpected char '{}' (Unicode {})",
-                            self.line,
-                            self.column,
+                        errors.push(LexerError::UnexpectedChar {
+                            position: Position {
+                                line: self.line,
+                                column: self.column,
+                            },
                             c,
-                            c.escape_unicode()
-                        );
+                        });
                     }
                 }
             }
@@ -369,7 +386,11 @@ impl<'a> Lexer<'a> {
             line: self.line,
         });
 
-        return tokens;
+        if errors.is_empty() {
+            return Ok(tokens);
+        } else {
+            return Err(errors);
+        }
     }
 }
 
@@ -494,7 +515,7 @@ mod tests {
     #[test]
     fn test_plus() {
         let mut lex = Lexer::new("+");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -507,7 +528,7 @@ mod tests {
     #[test]
     fn test_minus() {
         let mut lex = Lexer::new("-");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -520,7 +541,7 @@ mod tests {
     #[test]
     fn test_times() {
         let mut lex = Lexer::new("*");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -533,7 +554,7 @@ mod tests {
     #[test]
     fn test_divide() {
         let mut lex = Lexer::new("/");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -546,7 +567,7 @@ mod tests {
     #[test]
     fn test_equals() {
         let mut lex = Lexer::new("=");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -559,7 +580,7 @@ mod tests {
     #[test]
     fn test_double_equals() {
         let mut lex = Lexer::new("==");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -572,7 +593,7 @@ mod tests {
     #[test]
     fn test_not_equals() {
         let mut lex = Lexer::new("!=");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -586,7 +607,7 @@ mod tests {
     #[test]
     fn test_greater_than() {
         let mut lex = Lexer::new(">");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -600,7 +621,7 @@ mod tests {
     #[test]
     fn test_less_than() {
         let mut lex = Lexer::new("<");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -614,7 +635,7 @@ mod tests {
     #[test]
     fn test_greater_or_equal() {
         let mut lex = Lexer::new(">=");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -628,7 +649,7 @@ mod tests {
     #[test]
     fn test_less_or_equal() {
         let mut lex = Lexer::new("<=");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -642,7 +663,7 @@ mod tests {
     #[test]
     fn test_boolean_not() {
         let mut lex = Lexer::new("!");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -656,7 +677,7 @@ mod tests {
     #[test]
     fn test_semicolon() {
         let mut lex = Lexer::new(";");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -671,7 +692,7 @@ mod tests {
     #[test]
     fn test_opening_parentheses() {
         let mut lex = Lexer::new("(");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -686,7 +707,7 @@ mod tests {
     #[test]
     fn test_closing_parentheses() {
         let mut lex = Lexer::new(")");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -701,7 +722,7 @@ mod tests {
     #[test]
     fn test_opening_braces() {
         let mut lex = Lexer::new("{");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -716,7 +737,7 @@ mod tests {
     #[test]
     fn test_closing_braces() {
         let mut lex = Lexer::new("}");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -731,7 +752,7 @@ mod tests {
     #[test]
     fn test_true() {
         let mut lex = Lexer::new("true");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -746,7 +767,7 @@ mod tests {
     #[test]
     fn test_false() {
         let mut lex = Lexer::new("false");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -761,7 +782,7 @@ mod tests {
     #[test]
     fn test_and() {
         let mut lex = Lexer::new("and");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -776,7 +797,7 @@ mod tests {
     #[test]
     fn test_or() {
         let mut lex = Lexer::new("or");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -791,7 +812,7 @@ mod tests {
     #[test]
     fn test_var() {
         let mut lex = Lexer::new("var");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -806,7 +827,7 @@ mod tests {
     #[test]
     fn test_print() {
         let mut lex = Lexer::new("print");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -821,7 +842,7 @@ mod tests {
     #[test]
     fn test_if() {
         let mut lex = Lexer::new("if");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -836,7 +857,7 @@ mod tests {
     #[test]
     fn test_else() {
         let mut lex = Lexer::new("else");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -851,7 +872,7 @@ mod tests {
     #[test]
     fn test_while() {
         let mut lex = Lexer::new("while");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -866,7 +887,7 @@ mod tests {
     #[test]
     fn test_identifier() {
         let mut lex = Lexer::new("foo");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -879,7 +900,7 @@ mod tests {
 
         // Starting with a keyword
         let mut lex = Lexer::new("if32");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[0],
@@ -895,7 +916,7 @@ mod tests {
     fn test_number() {
         // Integer
         let mut lex = Lexer::new("123");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -907,7 +928,7 @@ mod tests {
 
         // Float
         let mut lex = Lexer::new("123.456");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -919,7 +940,7 @@ mod tests {
 
         // Float with no decimal digits.
         let mut lex = Lexer::new("123.");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -933,23 +954,21 @@ mod tests {
         // Lexer should recogniez the number (123.456) fine, but then balk on finding a lone
         // decimal point.
         let mut lex = Lexer::new("123.456.");
-        let tokens = lex.tokenize();
+        let errors = lex.tokenize().unwrap_err();
         assert_eq!(
-            tokens[0],
-            Token {
-                token_type: TokenType::Number,
-                lexeme: "123.456".into(),
-                line: 1
+            errors[0],
+            LexerError::UnexpectedChar {
+                position: Position { line: 1, column: 8 },
+                c: '.'
             }
         );
-        // First token is the number, second the end-of-file marker.
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(errors.len(), 1);
     }
 
     #[test]
     fn test_string() {
         let mut lex = Lexer::new("\"Hello world\"");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -963,7 +982,7 @@ mod tests {
     #[test]
     fn test_empty_string() {
         let mut lex = Lexer::new("\"\"");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
         assert_eq!(
             tokens[0],
             Token {
@@ -977,21 +996,24 @@ mod tests {
     #[test]
     fn test_unterminated_string() {
         let mut lex = Lexer::new("\"Hello world");
-        let tokens = lex.tokenize();
+        let errors = lex.tokenize().unwrap_err();
         assert_eq!(
-            tokens,
-            vec![Token {
-                token_type: TokenType::EndOfile,
-                lexeme: "".into(),
-                line: 1
-            }]
+            errors[0],
+            LexerError::UnterminatedStringSequence {
+                starts_at: Position { line: 1, column: 1 },
+                ends_at: Position {
+                    line: 1,
+                    column: 13
+                }
+            },
         );
+        assert_eq!(errors.len(), 1);
     }
 
     #[test]
     fn test_comment() {
         let mut lex = Lexer::new("// This is a comment\n1");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         // Should have outright skipped the comment
         assert_eq!(
@@ -1012,7 +1034,7 @@ mod tests {
     #[test]
     fn test_newline() {
         let mut lex = Lexer::new("a = 1;\nb = 2;");
-        let _ = lex.tokenize();
+        let _ = lex.tokenize().unwrap();
 
         assert_eq!(lex.line, 2);
         assert_eq!(lex.column, 7);
@@ -1021,7 +1043,7 @@ mod tests {
     #[test]
     fn test_end_of_file() {
         let mut lex = Lexer::new("a");
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(
             tokens[1],
@@ -1066,7 +1088,7 @@ while (a < 10) {
 ";
 
         let mut lex = Lexer::new(input);
-        let tokens = lex.tokenize();
+        let tokens = lex.tokenize().unwrap();
 
         assert_eq!(tokens.len(), 94);
     }
